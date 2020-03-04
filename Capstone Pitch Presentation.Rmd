@@ -1,0 +1,60 @@
+---
+title: "Coursera Capstone Presentation - Next Word Prediction"
+author: "Chris Robertson"
+date: "February 2020"
+output: ioslides_presentation
+---
+
+<style>
+pre {
+  font-size: 10px;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Background and Objective {.smaller}
+
+For this Capstone course in the Johns Hopkins Coursera Data Science Specialization, we are tasked with building a NLP model that can predict the next word given a series of words. The model is accessed by users via a web interface using shiny so that users can enter text and obtain predictions. 
+
+The process to build this application included the following steps:
+
+1. Cleaning the data set. The data set was a corpus of text from news websites, blogs, and twitter
+
+2. Perform an exploratory analysis of the data set
+
+3. Build a predictive model in R using the provided corpus text
+
+4. Build a web interface to the model using Shiny, so that end-users can access the application
+
+
+## Method Used {.smaller}
+
+The following were considered when building the model so that it would run efficiently both locally and as a Shiny application: 
+
+• The Stupid Backoff methodology was chosen as it is is inexpensive to train on large data sets and approaches the quality of Kneser-Ney Smoothing as the amount of traning data increases. 
+
+   Reference: [Large Language Models in Machine Translation](https://www.aclweb.org/anthology/D07-1090.pdf)
+
+• A 4-gram model was created that utilizes the Stupid Backoff smoothing methodology for training the language model.  It was found that a 4-gram model provided a good balance between accuracy and processing speed.
+
+• The training corpus is a 10% sample of English blogs, news and twitter. After data cleaning and filtering, the resulting corpus was transformed into unigram, bigram, trigram and 4-gram document-frequency matrix
+
+• Benchmark was conducted to test the accuracy of the Stupid Backoff model. I selected 10% of the corpus to use for becnhmarking purposes.  The benchamrk showed a model accuracy rate of 21%.
+
+
+## References {.smaller}
+
+The Shiny application can be found in:
+
+[Shiny Application](https://chrisrobbo.shinyapps.io/DDP_Assignment1/)
+
+All code and data can be viewed in the following GitHub repository:
+
+[Supporting Code](https://github.com/Robbocj01/DevelopingDataProducts)
+
+The exploratory data analysis report can b e found in:
+
+[Exploratory Data Analysis Report](https://rpubs.com/Robbocj/570384)

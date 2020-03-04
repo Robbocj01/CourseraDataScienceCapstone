@@ -1,0 +1,265 @@
+---
+title: "Coursera Data Science Capstone Swfitkey Data Analysis"
+author: "Chris Robertson"
+date: "31 January 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages, include=FALSE, echo=FALSE, message=FALSE, warn = FALSE}
+library(utils)
+library(ngram)
+library(tm)
+library(quanteda)
+library(ggplot2)
+library(readtext)
+library(knitr)
+library(kableExtra)
+library(stringi)
+```
+# Introduction
+The milestone report provides the exploratory data analysis of the SwiftKey data provided in the context of the Coursera Data Science Capstone. The data consists of three text files from three different sources (blogs, news and twitter),
+
+# Environment Setup
+First party of the exploratory data analytics is setting up the enviroment, removing any residual objects, freeing up memory and display statistics on free memory.  I have masked any code not relevant to this analysis.
+
+### Free Memory
+
+```{r environment_setup, , echo=FALSE, message=FALSE}
+# Remove any residual lists and set working directory
+rm(list = ls())
+
+# Set working directory
+setwd("C:/Users/rober/Desktop/Coursera/Data Science Capstone")
+
+# Set file paths
+blogsFileName <- "./Data/Coursera-SwiftKey/final/en_US/en_US.blogs.txt"
+newsFileName <- "./Data/Coursera-SwiftKey/final/en_US/en_US.news.txt"
+twitterFileName <- "./Data/Coursera-SwiftKey/final/en_US/en_US.twitter.txt"
+
+# Load data files
+con <- file(blogsFileName, open="rb")
+blogs <- readLines(con, encoding = "UTF-8", skipNul = TRUE, warn = FALSE)
+close(con)
+
+con <- file(newsFileName, open="rb")
+news <- readLines(con, encoding = "UTF-8", skipNul = TRUE, warn = FALSE)
+close(con)
+
+con <- file(twitterFileName, open="rb")
+twitter <- readLines(con, encoding = "UTF-8", skipNul = TRUE, warn = FALSE)
+close(con)
+rm(con)
+
+# free up memory and display statistics on free memory
+gc()
+```
+
+
+# Raw Data
+The data has been downloaded and unzipped and saved into the active R directory.  This process is outside the scpe of this document.
+
+This analysis uses the files named locale.source.txt where locale is the each of the four locales en_US, de_DE, ru_RU and fi_FI. The source is blogs, news and twitter. For the purposes of this exploratory data analysis the en_US datasets have been used.
+
+# Preparing the Data
+
+### Meta Data Summary
+For the meta data evaluation the data has been loaded for each of the three files - blogs, news and twitter. This sections evaluates the files to check the metadata. This includes the file sizes (in megabytes), number of lines in each file, number of words, length of the longest line.
+
+``` {r data_summary}
+# Check filesize
+blog_size <- file.info(blogsFileName)$size / (1024*1024)
+news_size <- file.info(newsFileName)$size / (1024*1024)
+twitter_size <- file.info(twitterFileName)$size / (1024*1024)
+
+#Check file length
+blog_length <- length(blogs)
+news_length <- length(news)
+twitter_length <- length(twitter)
+
+# Check length of longest line
+blog_nchar <- max(nchar(blogs))
+news_nchar <- max(nchar(news))
+twitter_nchar <- max(nchar(twitter))
+
+# Check word count
+blog_wc <- sum(stri_count_words(blogs))
+news_wc <- sum(stri_count_words(news))
+twitter_wc <- sum(stri_count_words(twitter))
+
+summary_df <- data.frame("File Name" = c("twitter", "blogs", "news"),
+           "File Size" = c(twitter_size,blog_size, news_size),
+           "File Length" = c(twitter_length,blog_length, news_length),
+           "Longest Line" = c(twitter_nchar,blog_nchar,news_nchar),
+           "Word Count" = c(twitter_wc,blog_wc,news_wc))
+           
+summary_df %>%
+  kable() %>%
+  kable_styling()
+```
+
+### Subset the Data
+The data files are large which will slow down the processing considerably. As a result this analysis takes a representative sample from the data for the analysis. For the purposes of this analysis the sample size is 1%. The samples are also combined into one corpus for ease of analysis.
+
+```{r data_upload}
+
+samp_size <- 0.01
+
+# Blogs file
+blogs_s <- sample(blogs,length(blogs)*samp_size)
+corpusBlog <- VCorpus(VectorSource(blogs_s))
+corpusBlog <- corpus(corpusBlog)
+
+# News
+news_s <- sample(news,length(news)*samp_size)
+corpusNews <- VCorpus(VectorSource(news_s))
+corpusNews <- corpus(corpusNews)
+
+# Twitter
+twitter_s <- sample(twitter,length(twitter)*samp_size)
+corpusTwitter <- VCorpus(VectorSource(twitter_s))
+corpusTwitter <- corpus(corpusTwitter)
+
+#Combine datafiles
+corpusCombined <- corpusBlog+corpusNews+corpusTwitter
+
+#Check sample file length
+blog_s_length <- length(blogs_s)
+news_s_length <- length(news_s)
+twitter_s_length <- length(twitter_s)
+
+# Check sample length of longest line
+blog_s_nchar <- max(nchar(blogs_s))
+news_s_nchar <- max(nchar(news_s))
+twitter_s_nchar <- max(nchar(twitter_s))
+
+# Check word count
+blog_s_wc <- sum(stri_count_words(blogs_s))
+news_s_wc <- sum(stri_count_words(news_s))
+twitter_s_wc <- sum(stri_count_words(twitter_s))
+
+summary_df_s <- data.frame("Sample File Name" = c("twitter", "blogs", "news"),
+           "File Length" = c(twitter_s_length,blog_s_length, news_s_length),
+           "Longest Line" = c(twitter_s_nchar,blog_s_nchar,news_s_nchar),
+           "Word Count" = c(twitter_s_wc,blog_s_wc,news_s_wc))
+           
+summary_df_s %>%
+  kable() %>%
+  kable_styling()
+
+```
+
+# Date Cleaning and Tokenisation
+With the combine corpus created the next step is to tokenize the data from which the nGrams can be created. The first step of the process is to remove any numbers, punctuaton,symbols, separators and hyphens from the data. 
+
+```{r data_tokenisation}
+
+masterTokens <- tokens(corpusCombined,
+                       remove_numbers = TRUE,
+                       remove_punct = TRUE,
+                       remove_symbols = TRUE,
+                       remove_hyphens = TRUE,
+                       remove_twitter = TRUE,
+                       remove_separators = TRUE)
+```
+
+Once this is done the data is further cleaned to remove as much of the noise as possible. All the data will be transformed to lower case, any items that start or end with anything other than a letter will also be removed.
+
+```{r data_tokenisation_part2}
+
+masterTokens <- tokens_tolower(masterTokens)
+masterTokens <- tokens_select(masterTokens, stopwords('english'),selection='remove')
+masterTokens <- tokens_remove(masterTokens, pattern="^[^a-zA-Z]|[^a-zA-Z]$", valuetype="regex", padding=FALSE)
+
+```
+
+The next step is to create a Document Feature Matrix (dfm) from the tokens. A dfm is is summary matrix of all the tokens and the example below shows the top 10 words in the dfm. 
+
+```{r create_dfm}
+
+corpusDfm <- dfm(masterTokens)
+topfeatures(corpusDfm, n=10)%>%
+  kable() %>%
+  kable_styling()
+
+```
+
+
+# Exploratory Data Analysis
+The first part of the exploratory data analysis is to create a word cloud of the common words across the sample corpus. This provides a good visualisation of what is common across the sample.
+
+```{r create_word_cloud}
+
+# Create wordcloud
+textplot_wordcloud(corpusDfm, max_words=100,
+                   color = c('red', 'pink', 'green', 'purple', 'orange', 'blue'))
+
+```
+
+# Create Unigrams
+The next step of the analysis is to create ngrams. Ngrams are a sequence of text in the data. Unigrams are single words, Bigrams are two word combinations and Trigrams are three-word combinations.
+
+### Unigrams
+The following function is used to extract Unigrams from the previously created text corpus using quanteda tokens and then charts the frequency of the top 25 words. Unsurprisingly this alines with the words that we visualised in the word cloud.
+
+```{r create_unigrams}
+
+UniGram <- tokens_ngrams(masterTokens, n=1, concatenator = " ")
+UniGramDf <- dfm(UniGram)
+topfeatures(UniGramDf, n=25)
+
+# Determine frequency of words in the corpus
+features_dfm_uni <- textstat_frequency(UniGramDf, n = 50)
+# Sort by reverse frequency order
+features_dfm_uni$feature <- with(features_dfm_uni, reorder(feature, -frequency))
+# Plot the frequency of words
+ggplot(features_dfm_uni, aes(x = feature, y = frequency)) +
+  geom_point() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+### Bigrams
+The following function is used to extract Bigrams from the previously created text corpus using quanteda tokens and then charts the frequency of the top 25 words. 
+
+```{r create_bigrams}
+
+BiGram <- tokens_ngrams(masterTokens, n=2, concatenator = " ")
+BiGramDf <- dfm(BiGram)
+topfeatures(BiGramDf, n=25)
+
+# Determine frequency of words in the corpus
+features_dfm_Bi <- textstat_frequency(BiGramDf, n = 50)
+# Sort by reverse frequency order
+features_dfm_Bi$feature <- with(features_dfm_Bi, reorder(feature, -frequency))
+# Plot the frequency of words
+ggplot(features_dfm_Bi, aes(x = feature, y = frequency)) +
+  geom_point() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+### Trigrams
+The following function is used to extract Trigrams from the previously created text corpus using quanteda tokens and then charts the frequency of the top 25 words.
+
+```{r create_Trigrams}
+
+TriGram <- tokens_ngrams(masterTokens, n=3, concatenator = " ")
+TriGramDf <- dfm(TriGram)
+topfeatures(TriGramDf, n=25)
+
+# Determine frequency of words in the corpus
+features_dfm_Tri <- textstat_frequency(TriGramDf, n = 50)
+# Sort by reverse frequency order
+features_dfm_Tri$feature <- with(features_dfm_Tri, reorder(feature, -frequency))
+# Plot the frequency of words
+ggplot(features_dfm_Tri, aes(x = feature, y = frequency)) +
+  geom_point() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+# Next Steps
+This concludes the exploratory data analysis. The next step will be next step a model that will be created and integrated into a Shiny app for word prediction.
+
+
